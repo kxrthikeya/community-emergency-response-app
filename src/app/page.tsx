@@ -4,10 +4,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import LoginForm from "@/components/LoginForm";
-import EmergencyContactsDialog from "@/components/EmergencyContactsDialog";
-import { AlertTriangle, List } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import Header from "@/components/Header";
+import { AlertTriangle } from "lucide-react";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -29,6 +27,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <Header user={null} showAuth={false} />
+
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
         <div className="text-center mb-12">
@@ -41,22 +41,9 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Login and Emergency Contacts */}
+        {/* Login Form */}
         <div className="flex flex-col items-center gap-6">
           <LoginForm />
-          
-          <div className="flex items-center gap-4">
-            <div className="h-px w-24 bg-border" />
-            <EmergencyContactsDialog />
-            <div className="h-px w-24 bg-border" />
-          </div>
-
-          <Link href="/emergencies">
-            <Button variant="outline" size="lg" className="gap-2">
-              <List className="h-5 w-5" />
-              View Emergency Feed
-            </Button>
-          </Link>
 
           <p className="text-sm text-muted-foreground text-center max-w-md">
             In an emergency? Use guest mode to report immediately or call

@@ -1,306 +1,221 @@
-# EmergencyConnect - Real-Time Emergency Response System
+# EmergencyConnect
 
-A comprehensive emergency reporting and response application built with Next.js 15, featuring real-time incident mapping, instant SMS/voice alerts, and role-based dashboards for emergency responders.
+A real-time emergency reporting system built with Next.js 15, enabling citizens to report emergencies instantly and connect with emergency services.
 
-## 🚨 Features
+## 🚀 Features
 
-### Core Functionality
-- **Quick Emergency Reporting**: Report emergencies with text, photos, and location data
-- **Live Incident Map**: Real-time OpenStreetMap visualization of all active incidents
-- **Instant Alerts**: Automatic SMS and voice call alerts to appropriate emergency services
-- **Emergency Contacts**: Direct calling to Indian emergency services (Police, Fire, Ambulance, etc.)
-- **Role-Based Access**: Separate dashboards for citizens, emergency responders, and admins
-
-### Authentication Options
-1. **Phone/OTP Login**: Secure authentication via Twilio SMS
-2. **Google Sign-In**: Quick OAuth2 authentication
-3. **Guest Mode**: Immediate access for urgent emergency reporting
-
-### Emergency Types Supported
-- 🔥 Fire Emergency → Fire Station (101)
-- 🚑 Medical Emergency → Ambulance (102/108)
-- 🚨 Crime/Security → Police (100)
-- 🌊 Natural Disaster → Disaster Management (108)
-- ⚠️ Other Emergencies → National Emergency (112)
-
-### Smart Alert System
-- **Medium/Low Severity**: SMS notification to emergency services
-- **High/Critical Severity**: SMS + Voice call for immediate response
-- Automatic routing to correct department based on emergency type
-- Real-time location and incident details included
+- **Real-time Emergency Reporting** - Report fires, medical emergencies, crimes, and natural disasters
+- **Live Incident Map** - Interactive OpenStreetMap showing all active emergencies
+- **Emergency Feed** - Social media-style feed of all reported incidents
+- **Multi-Authentication** - Phone OTP, Google OAuth, and Guest mode
+- **Role-Based Access** - Citizen, Emergency Responder, and Admin roles
+- **SMS/Voice Alerts** - Automatic Twilio notifications to emergency services
+- **Photo Upload** - Attach images to emergency reports (Base64 encoding)
+- **Location Services** - GPS-based location detection
+- **Responder Dashboard** - Real-time incident monitoring for emergency teams
+- **Admin Panel** - Manage emergency service contacts
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 15 (App Router)
-- **UI**: Shadcn/UI + Tailwind CSS
-- **Database**: Turso (SQLite) + Drizzle ORM
+- **UI**: React 19, Tailwind CSS 4, shadcn/ui
 - **Authentication**: NextAuth.js
-- **Maps**: React Leaflet + OpenStreetMap
-- **SMS/Voice**: Twilio API
-- **Language**: TypeScript
+- **Database**: Turso (LibSQL)
+- **ORM**: Drizzle ORM
+- **Maps**: React Leaflet, OpenStreetMap
+- **Notifications**: Twilio (SMS/Voice)
+- **Deployment**: Vercel-ready
 
 ## 📋 Prerequisites
 
 - Node.js 18+ or Bun
-- Twilio Account (for SMS/Voice alerts)
-- Google OAuth Credentials (optional, for Google sign-in)
+- Turso account (https://turso.tech)
+- Twilio account (https://www.twilio.com)
+- Google Cloud Console project (optional, for Google OAuth)
 
-## 🚀 Getting Started
+## 🔧 Installation
 
-### 1. Clone and Install
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd emergency-connect
+   ```
 
-```bash
-# Install dependencies
-npm install
-# or
-bun install
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   bun install
+   ```
 
-### 2. Environment Variables
+3. **Set up environment variables**
+   
+   Copy `.env.example` to `.env` and fill in your credentials:
+   ```bash
+   cp .env.example .env
+   ```
 
-The `.env` file is already configured with Twilio credentials:
+   Required variables:
+   - `TURSO_CONNECTION_URL` - Your Turso database URL
+   - `TURSO_AUTH_TOKEN` - Your Turso authentication token
+   - `TWILIO_ACCOUNT_SID` - Twilio account SID
+   - `TWILIO_AUTH_TOKEN` - Twilio auth token
+   - `TWILIO_PHONE_NUMBER` - Twilio phone number
+   - `NEXTAUTH_URL` - Your app URL (http://localhost:3000 for dev)
+   - `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
+   - `GOOGLE_CLIENT_ID` - (Optional) Google OAuth client ID
+   - `GOOGLE_CLIENT_SECRET` - (Optional) Google OAuth client secret
 
-```env
-# Database (Already configured)
-TURSO_CONNECTION_URL=libsql://...
-TURSO_AUTH_TOKEN=...
+4. **Set up the database**
+   ```bash
+   npm run db:push
+   # or
+   bun run db:push
+   ```
 
-# Twilio (Already configured)
-TWILIO_ACCOUNT_SID=ACfac3d3917e35e9d5c6fc6c5747f40fde
-TWILIO_AUTH_TOKEN=8d4da91fc64ad9e4c8e5c1da59a87aef
-TWILIO_PHONE_NUMBER=+14247811513
+5. **Run the development server**
+   ```bash
+   npm run dev
+   # or
+   bun run dev
+   ```
 
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key-here-change-in-production
+   Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-# Google OAuth (Optional)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-```
+## 🚢 Deployment
 
-### 3. Generate NextAuth Secret
+### Vercel Deployment (Recommended)
 
-```bash
-# Generate a secure random string
-openssl rand -base64 32
-# Add the output to NEXTAUTH_SECRET in .env
-```
+1. **Push to GitHub**
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   git push origin main
+   ```
 
-### 4. Google OAuth Setup (Optional)
+2. **Deploy to Vercel**
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Add all environment variables from `.env`
+   - Update `NEXTAUTH_URL` to your Vercel domain
+   - Generate a new `NEXTAUTH_SECRET` for production
+   - Click Deploy
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select existing
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-6. Copy Client ID and Client Secret to `.env`
+3. **Post-Deployment**
+   - Configure Google OAuth redirect URIs: `https://your-domain.com/api/auth/callback/google`
+   - Verify Twilio alerts work from production
+   - Test all authentication methods
 
-### 5. Run Database Migrations
-
-```bash
-# The database is already set up with schema and seed data
-# But if you need to reset:
-npm run db:push
-npm run db:seed
-```
-
-### 6. Start Development Server
-
-```bash
-npm run dev
-# or
-bun dev
-```
-
-Visit [http://localhost:3000](http://localhost:3000)
-
-## 📱 Testing the Application
-
-### Development Mode Features
-- **Auto OTP**: In development, use OTP `123456` for phone login
-- **Test Users**: Pre-seeded test users available (see Database section)
-- **Mock Alerts**: Twilio alerts logged to console in dev mode
-
-### Test Accounts
+## 📁 Project Structure
 
 ```
-Citizen User:
-- Phone: +919876543210
-- Email: rahul.sharma@example.com
-- OTP: 123456 (dev mode)
-
-Emergency Responder:
-- Email: priya.singh@emergency.gov.in
-- Access: /responder dashboard
-
-Admin:
-- Email: admin@emergency.gov.in
-- Access: /admin settings
+src/
+├── app/                    # Next.js app router pages
+│   ├── page.tsx           # Homepage with login
+│   ├── dashboard/         # User dashboard
+│   ├── emergencies/       # Public emergency feed
+│   ├── responder/         # Responder dashboard
+│   ├── admin/             # Admin settings
+│   └── api/               # API routes
+├── components/            # React components
+│   ├── ui/               # shadcn/ui components
+│   ├── Header.tsx        # Reusable navigation header
+│   ├── LoginForm.tsx     # Authentication form
+│   ├── MapView.tsx       # Live incident map
+│   └── ReportEmergencyForm.tsx  # Emergency reporting with photo upload
+├── db/                    # Database configuration
+│   ├── index.ts          # Drizzle client
+│   ├── schema.ts         # Database schema
+│   └── seeds/            # Seed data
+└── lib/                   # Utilities
+    ├── auth.ts           # NextAuth configuration
+    └── otp-store.ts      # OTP management
 ```
 
-## 🗺️ Application Routes
+## 🔐 Authentication
 
-### Public Routes
-- `/` - Homepage with login options and emergency contacts
-- `/api/auth/*` - Authentication endpoints
+The app supports three authentication methods:
 
-### Protected Routes
-- `/dashboard` - Main user dashboard with map, report form, and incidents
-- `/responder` - Emergency responder dashboard (role: emergency_responder, admin)
-- `/admin` - Admin settings for emergency contacts (role: admin)
+1. **Phone OTP** - SMS-based one-time password (development mode auto-fills)
+2. **Google OAuth** - Sign in with Google
+3. **Guest Mode** - Quick access for emergencies
 
-## 📊 API Endpoints
+## 👥 User Roles
 
-### Incidents API
-```
-GET    /api/incidents              - List all incidents (with filters)
-GET    /api/incidents?id=[id]      - Get single incident
-POST   /api/incidents              - Create new incident
-PATCH  /api/incidents?id=[id]      - Update incident status
-```
+- **Citizen** - Report and view emergencies
+- **Emergency Responder** - Monitor and update incident status
+- **Admin** - Manage emergency service contacts
 
-### Emergency Contacts API
-```
-GET    /api/emergency-contacts     - List emergency contacts
-GET    /api/emergency-contacts?id=[id] - Get single contact
-POST   /api/emergency-contacts     - Create new contact
-PUT    /api/emergency-contacts?id=[id] - Update contact
-```
-
-### Authentication API
-```
-POST   /api/auth/send-otp         - Send OTP to phone number
-POST   /api/auth/signin           - Sign in with credentials
-```
-
-### Twilio Alert API
-```
-POST   /api/twilio/alert          - Send emergency alert (SMS + Voice)
-```
-
-## 🎯 User Workflows
+## 🗺️ Features Guide
 
 ### Reporting an Emergency
-1. User logs in (Phone/Google/Guest)
-2. Clicks "Report" tab
-3. Selects emergency type and severity
-4. Adds description and location (auto or manual)
-5. Optionally adds photo
-6. Submits report
-7. System creates incident in database
-8. System sends SMS/Voice alert to appropriate emergency service
-9. Incident appears on live map for all users
+1. Sign in or use guest mode
+2. Go to Dashboard → Report tab
+3. Select emergency type and severity
+4. Add description and location (or use GPS)
+5. Optionally upload a photo (max 5MB)
+6. Submit - Emergency services are notified via Twilio
 
-### Emergency Responder Workflow
-1. Responder logs in
-2. Views real-time incident dashboard
-3. Filters by status (Active/Responding/Resolved)
-4. Updates incident status
-5. Opens location in Google Maps
-6. Responds to emergency
+### Emergency Feed
+- View all reported emergencies in real-time
+- Filter by type, status, and severity
+- See emergency photos and locations
+- Auto-refreshes every 10 seconds
 
-### Admin Workflow
-1. Admin logs in
-2. Goes to /admin
-3. Updates emergency service contact numbers
-4. Activates/deactivates services
-5. Manages system configuration
+### Responder Dashboard
+- Real-time incident monitoring
+- Update incident status (Active → Responding → Resolved)
+- View incident details and location
+- Open locations in Google Maps
 
-## 📞 Indian Emergency Numbers (Pre-configured)
+### Admin Settings
+- Configure emergency service contacts
+- Update phone numbers for alerts
+- Activate/deactivate services
 
-| Service | Number |
-|---------|--------|
-| National Emergency | 112 |
-| Police | 100 |
-| Fire Brigade | 101 |
-| Ambulance | 102 |
-| Disaster Management | 108 |
-| Women Helpline | 1091 |
-| Child Helpline | 1098 |
-| Senior Citizen Helpline | 14567 |
-| Air Ambulance | 9540161344 |
+## 🔔 Twilio Configuration
 
-## 🔒 Security Features
+The app sends SMS/voice alerts to emergency services when an incident is reported.
 
-- **JWT-based authentication** with NextAuth.js
-- **Role-based access control** (citizen, emergency_responder, admin)
-- **Guest mode** with limited permissions
-- **Phone verification** via Twilio OTP
-- **Secure API routes** with validation
-
-## 🚀 Deployment
-
-### Environment Variables for Production
-```bash
-# Update these in your hosting platform
-NEXTAUTH_URL=https://yourdomain.com
-NEXTAUTH_SECRET=<generate-secure-secret>
-TWILIO_ACCOUNT_SID=<your-twilio-sid>
-TWILIO_AUTH_TOKEN=<your-twilio-token>
-TWILIO_PHONE_NUMBER=<your-twilio-number>
-```
-
-### Recommended Platforms
-- **Vercel** (recommended for Next.js)
-- **Netlify**
-- **Railway**
-- **AWS/Azure/GCP**
-
-## 📝 Development Notes
-
-### Database Schema
-- `users` - User accounts with roles
-- `incidents` - Emergency reports
-- `emergency_contacts` - Service contact numbers
-- `incident_responses` - Responder actions
-- `notifications` - User notifications
-
-### Key Components
-- `MapView.tsx` - OpenStreetMap with real-time markers
-- `ReportEmergencyForm.tsx` - Emergency reporting interface
-- `EmergencyContactsDialog.tsx` - Quick access to emergency numbers
-- `LoginForm.tsx` - Multi-method authentication
+1. Sign up at [twilio.com](https://www.twilio.com)
+2. Get a phone number with SMS/Voice capabilities
+3. Add credentials to `.env`
+4. Configure emergency contacts in Admin Settings
 
 ## 🐛 Troubleshooting
 
-### Maps not loading
-- Ensure Leaflet CSS is imported
-- Check console for errors
-- Verify network access to OpenStreetMap
+### Map not loading
+- Ensure browser supports Leaflet
+- Check browser console for errors
+- Verify internet connection for tile loading
 
-### Twilio alerts not sending
-- Verify credentials in `.env`
-- Check Twilio account balance
-- Ensure phone numbers are in E.164 format (+919876543210)
+### OTP not received
+- Development mode shows OTP in toast notification
+- For production: Check Twilio credentials and phone number format
+- View Twilio console for delivery logs
 
-### Authentication issues
-- Clear browser cookies
-- Verify NEXTAUTH_SECRET is set
-- Check NEXTAUTH_URL matches your domain
+### Database connection errors
+- Verify Turso credentials in `.env`
+- Check network connectivity
+- Run `npm run db:push` to sync schema
 
-## 🤝 Contributing
-
-This is a demo/prototype application. For production use:
-1. Add Redis for OTP storage
-2. Implement WebSocket for real-time updates
-3. Add push notifications
-4. Implement geofencing for nearby alerts
-5. Add incident photos upload (Cloudinary/S3)
-6. Add multi-language support
+### Photo upload not working
+- Check file size (max 5MB)
+- Ensure file is an image format
+- Verify browser supports FileReader API
 
 ## 📄 License
 
-MIT License - feel free to use for emergency response systems
+MIT
 
-## 🆘 Support
+## 🤝 Contributing
 
-For immediate emergencies, always call your local emergency services:
-- **India**: 112 (National Emergency Number)
-- **USA**: 911
-- **UK**: 999
-- **EU**: 112
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## 📞 Support
+
+**For immediate emergencies, call 112 (India) or your local emergency services.**
 
 ---
 
-**Built with ❤️ to help communities respond faster in emergencies**
+Built with ❤️ for safer communities

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import Header from "@/components/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, MapPin, Clock, ArrowLeft, Filter } from "lucide-react";
+import { AlertTriangle, MapPin, Clock, Filter } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Incident {
@@ -107,38 +108,25 @@ export default function EmergenciesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      {/* Header */}
-      <div className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push(session ? "/dashboard" : "/")}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <AlertTriangle className="h-6 w-6 text-destructive" />
-                  Emergency Feed
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Real-time emergency reports from your community
-                </p>
-              </div>
-            </div>
-            {session && (
-              <Button onClick={() => router.push("/dashboard")}>
-                Report Emergency
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+      <Header user={session?.user} showAuth={!!session} />
 
       <div className="container mx-auto px-4 py-6">
+        {/* Page Header */}
+        <div className="mb-6">
+          <h2 className="text-3xl font-bold flex items-center gap-2">
+            <AlertTriangle className="h-8 w-8 text-destructive" />
+            Emergency Feed
+          </h2>
+          <p className="text-muted-foreground mt-2">
+            Real-time emergency reports from your community
+          </p>
+          {session && (
+            <Button onClick={() => router.push("/dashboard")} className="mt-4">
+              Report Emergency
+            </Button>
+          )}
+        </div>
+
         {/* Filters */}
         <Card className="mb-6">
           <CardHeader>

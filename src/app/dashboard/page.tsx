@@ -8,11 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MapView from "@/components/MapView";
 import ReportEmergencyForm from "@/components/ReportEmergencyForm";
-import EmergencyContactsDialog from "@/components/EmergencyContactsDialog";
-import { signOut } from "next-auth/react";
-import { AlertCircle, Map, Bell, Settings, LogOut, Users, List } from "lucide-react";
+import Header from "@/components/Header";
+import { AlertCircle, Map, Bell } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import Link from "next/link";
 
 interface Incident {
   id: number;
@@ -68,42 +66,9 @@ export default function DashboardPage() {
     return null;
   }
 
-  const isResponder = session.user?.role === "emergency_responder" || session.user?.role === "admin";
-
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">EmergencyConnect</h1>
-            <p className="text-sm text-muted-foreground">
-              {session.user?.name || session.user?.phoneNumber || "User"}
-              {session.user?.isGuest && " (Guest)"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/emergencies">
-              <Button variant="outline" className="gap-2">
-                <List className="h-4 w-4" />
-                Emergency Feed
-              </Button>
-            </Link>
-            <EmergencyContactsDialog />
-            {isResponder && (
-              <Link href="/responder">
-                <Button variant="outline" className="gap-2">
-                  <Users className="h-4 w-4" />
-                  Responder Dashboard
-                </Button>
-              </Link>
-            )}
-            <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/" })}>
-              <LogOut className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Header user={session.user} showAuth={true} />
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
