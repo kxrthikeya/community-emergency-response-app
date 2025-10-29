@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, MapPin, Camera, Loader2 } from "lucide-react";
+import { AlertCircle, MapPin, Camera, Loader2, X, Upload } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
@@ -21,6 +21,7 @@ export default function ReportEmergencyForm() {
   const { data: session } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     emergencyType: "",
     description: "",
@@ -47,6 +48,37 @@ export default function ReportEmergencyForm() {
         }
       );
     }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image size must be less than 5MB");
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setImagePreview(base64String);
+      setFormData((prev) => ({ ...prev, photoUrl: base64String }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
+    setFormData((prev) => ({ ...prev, photoUrl: "" }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,17 +245,46 @@ export default function ReportEmergencyForm() {
             Use Current Location
           </Button>
 
+          {/* Photo Upload */}
           <div className="space-y-2">
-            <Label htmlFor="photoUrl">Photo URL (optional)</Label>
-            <Input
-              id="photoUrl"
-              type="url"
-              placeholder="https://example.com/photo.jpg"
-              value={formData.photoUrl}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, photoUrl: e.target.value }))
-              }
-            />
+            <Label htmlFor="photo">Upload Photo (optional)</Label>
+            {imagePreview ? (
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Emergency preview"
+                  className="w-full h-48 object-cover rounded-lg border"
+                />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-2 right-2"
+                  onClick={removeImage}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+                <input
+                  id="photo"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <label htmlFor="photo" className="cursor-pointer">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Click to upload image
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    PNG, JPG up to 5MB
+                  </p>
+                </label>
+              </div>
+            )}
           </div>
 
           <Button

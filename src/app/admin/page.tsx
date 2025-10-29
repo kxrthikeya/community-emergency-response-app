@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Save, Loader2, Trash2 } from "lucide-react";
-import Link from "next/link";
+import Header from "@/components/Header";
+import { Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface EmergencyContact {
@@ -89,26 +89,16 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">Admin Settings</h1>
-              <p className="text-sm text-muted-foreground">
-                Configure emergency service contacts
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header user={session?.user} showAuth={true} />
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Admin Settings</h1>
+          <p className="text-muted-foreground mt-1">
+            Configure emergency service contacts
+          </p>
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Emergency Service Contacts</CardTitle>

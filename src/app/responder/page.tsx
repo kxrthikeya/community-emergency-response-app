@@ -13,8 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, MapPin, Clock, AlertTriangle } from "lucide-react";
-import Link from "next/link";
+import Header from "@/components/Header";
+import { MapPin, Clock, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Incident {
@@ -125,33 +125,24 @@ export default function ResponderDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
+      <Header user={session?.user} showAuth={true} />
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold">Emergency Responder Dashboard</h1>
-                <p className="text-sm text-muted-foreground">
-                  Real-time incident monitoring and response
-                </p>
-              </div>
+            <div>
+              <h1 className="text-3xl font-bold">Emergency Responder Dashboard</h1>
+              <p className="text-muted-foreground mt-1">
+                Real-time incident monitoring and response
+              </p>
             </div>
             <Badge variant="destructive" className="text-lg px-4 py-2">
               {incidents.filter((i) => i.status === "active").length} Active
             </Badge>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
         <div className="mb-6">
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="w-[200px]">
