@@ -45,11 +45,20 @@ export default function DashboardPage() {
       })
         .then((res) => res.json())
         .then((data) => {
-          setIncidents(data);
+          // Ensure data is an array before setting state
+          if (Array.isArray(data)) {
+            setIncidents(data);
+          } else if (data && Array.isArray(data.incidents)) {
+            setIncidents(data.incidents);
+          } else {
+            console.error("Invalid data format from API:", data);
+            setIncidents([]);
+          }
           setLoading(false);
         })
         .catch((error) => {
           console.error("Error fetching incidents:", error);
+          setIncidents([]);
           setLoading(false);
         });
     }
