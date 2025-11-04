@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Header from "@/components/Header";
-import { MapPin, Clock, AlertTriangle } from "lucide-react";
+import { MapPin, Clock, AlertTriangle, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Incident {
@@ -31,36 +31,36 @@ interface Incident {
 }
 
 export default function ResponderDashboard() {
-  const { data: session, status } = useSession();
+  const { data: session, isPending } = useSession();
   const router = useRouter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("active");
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
+    if (!isPending && !session?.user) {
+      router.push("/login");
       return;
     }
 
-    if (status === "authenticated") {
-      const role = session.user?.role;
+    if (!isPending && session?.user) {
+      const role = session.user.role;
       if (role !== "emergency_responder" && role !== "admin") {
         router.push("/dashboard");
         return;
       }
     }
-  }, [status, session, router]);
+  }, [isPending, session, router]);
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (session?.user) {
       fetchIncidents();
       
       // Poll for updates every 5 seconds
       const interval = setInterval(fetchIncidents, 5000);
       return () => clearInterval(interval);
     }
-  }, [status, filter]);
+  }, [session, filter]);
 
   const fetchIncidents = () => {
     const params = new URLSearchParams();
@@ -69,7 +69,12 @@ export default function ResponderDashboard() {
       params.append("status", filter);
     }
 
-    fetch(`/api/incidents?${params.toString()}`)
+    const token = localStorage.getItem("bearer_token");
+    fetch(`/api/incidents?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
       .then((res) => res.json())
       .then((data) => {
         setIncidents(data);
@@ -83,9 +88,13 @@ export default function ResponderDashboard() {
 
   const handleStatusUpdate = async (incidentId: number, newStatus: string) => {
     try {
+      const token = localStorage.getItem("bearer_token");
       await fetch(`/api/incidents?id=${incidentId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ status: newStatus }),
       });
 
@@ -95,15 +104,10 @@ export default function ResponderDashboard() {
     }
   };
 
-  if (status === "loading" || loading) {
+  if (isPending || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="space-y-4 w-full max-w-4xl px-4">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

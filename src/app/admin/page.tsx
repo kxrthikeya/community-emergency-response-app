@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import Header from "@/components/Header";
 import { Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 interface EmergencyContact {
   id: number;
@@ -20,32 +21,37 @@ interface EmergencyContact {
 }
 
 export default function AdminSettingsPage() {
-  const { data: session, status } = useSession();
+  const { data: session, isPending } = useSession();
   const router = useRouter();
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
+    if (!isPending && !session?.user) {
+      router.push("/login");
       return;
     }
 
-    if (status === "authenticated" && session.user?.role !== "admin") {
+    if (!isPending && session?.user?.role !== "admin") {
       router.push("/dashboard");
       return;
     }
-  }, [status, session, router]);
+  }, [isPending, session, router]);
 
   useEffect(() => {
-    if (status === "authenticated" && session.user?.role === "admin") {
+    if (session?.user?.role === "admin") {
       fetchContacts();
     }
-  }, [status, session]);
+  }, [session]);
 
   const fetchContacts = () => {
-    fetch("/api/emergency-contacts?isActive=true&limit=100")
+    const token = localStorage.getItem("bearer_token");
+    fetch("/api/emergency-contacts?isActive=true&limit=100", {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
       .then((res) => res.json())
       .then((data) => {
         setContacts(data);
@@ -60,16 +66,20 @@ export default function AdminSettingsPage() {
   const handleUpdateContact = async (id: number, updates: Partial<EmergencyContact>) => {
     setSaving(true);
     try {
+      const token = localStorage.getItem("bearer_token");
       await fetch(`/api/emergency-contacts?id=${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(updates),
       });
       await fetchContacts();
-      alert("Contact updated successfully");
+      toast.success("Contact updated successfully");
     } catch (error) {
       console.error("Error updating contact:", error);
-      alert("Failed to update contact");
+      toast.error("Failed to update contact");
     } finally {
       setSaving(false);
     }
@@ -79,10 +89,10 @@ export default function AdminSettingsPage() {
     await handleUpdateContact(id, { isActive: !isActive });
   };
 
-  if (status === "loading" || loading) {
+  if (isPending || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Skeleton className="h-96 w-full max-w-4xl" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }

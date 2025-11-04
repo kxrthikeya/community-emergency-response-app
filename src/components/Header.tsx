@@ -1,23 +1,39 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, List, Users, Settings, LogOut, Phone } from "lucide-react";
+import { AlertTriangle, List, Users, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import EmergencyContactsDialog from "@/components/EmergencyContactsDialog";
-import { signOut } from "next-auth/react";
+import { authClient, useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface HeaderProps {
   user?: {
     name?: string | null;
-    phoneNumber?: string | null;
-    isGuest?: boolean;
+    email?: string | null;
     role?: string;
   } | null;
   showAuth?: boolean;
 }
 
 export default function Header({ user, showAuth = false }: HeaderProps) {
+  const router = useRouter();
+  const { refetch } = useSession();
+  
   const isResponder = user?.role === "emergency_responder" || user?.role === "admin";
   const isAdmin = user?.role === "admin";
+
+  const handleSignOut = async () => {
+    const { error } = await authClient.signOut();
+    if (error?.code) {
+      toast.error(error.code);
+    } else {
+      localStorage.removeItem("bearer_token");
+      refetch();
+      router.push("/");
+    }
+  };
 
   return (
     <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -32,8 +48,7 @@ export default function Header({ user, showAuth = false }: HeaderProps) {
               <h1 className="text-2xl font-bold">EmergencyConnect</h1>
               {user && (
                 <p className="text-xs text-muted-foreground">
-                  {user.name || user.phoneNumber || "User"}
-                  {user.isGuest && " (Guest)"}
+                  {user.name || user.email || "User"}
                 </p>
               )}
             </div>
@@ -66,7 +81,7 @@ export default function Header({ user, showAuth = false }: HeaderProps) {
                     </Button>
                   </Link>
                 )}
-                <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/" })}>
+                <Button variant="ghost" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4" />
                 </Button>
               </>

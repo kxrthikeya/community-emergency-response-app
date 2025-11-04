@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import MapView from "@/components/MapView";
 import ReportEmergencyForm from "@/components/ReportEmergencyForm";
 import Header from "@/components/Header";
-import { AlertCircle, Map, Bell } from "lucide-react";
+import { AlertCircle, Map, Bell, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Incident {
@@ -23,38 +23,39 @@ interface Incident {
 }
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
+  const { data: session, isPending } = useSession();
   const router = useRouter();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/");
+    if (!isPending && !session?.user) {
+      router.push("/login");
     }
-  }, [status, router]);
+  }, [session, isPending, router]);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      // Fetch user's incidents if not guest
-      if (!session.user?.isGuest && session.user?.id) {
-        fetch(`/api/incidents?userId=${session.user.id}`)
-          .then((res) => res.json())
-          .then((data) => {
-            setIncidents(data);
-            setLoading(false);
-          })
-          .catch((error) => {
-            console.error("Error fetching incidents:", error);
-            setLoading(false);
-          });
-      } else {
-        setLoading(false);
-      }
+    if (session?.user) {
+      // Fetch user's incidents
+      const token = localStorage.getItem("bearer_token");
+      fetch(`/api/incidents?userId=${session.user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          setIncidents(data);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching incidents:", error);
+          setLoading(false);
+        });
     }
-  }, [status, session]);
+  }, [session]);
 
-  if (status === "loading") {
+  if (isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -62,7 +63,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!session) {
+  if (!session?.user) {
     return null;
   }
 
@@ -157,24 +158,5 @@ export default function DashboardPage() {
         </Tabs>
       </main>
     </div>
-  );
-}
-
-function Loader2({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }

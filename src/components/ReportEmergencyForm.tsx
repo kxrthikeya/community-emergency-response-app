@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, MapPin, Camera, Loader2, X, Upload } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function ReportEmergencyForm() {
   const { data: session } = useSession();
@@ -41,10 +42,11 @@ export default function ReportEmergencyForm() {
             latitude: position.coords.latitude.toString(),
             longitude: position.coords.longitude.toString(),
           }));
+          toast.success("Location detected successfully");
         },
         (error) => {
           console.error("Location error:", error);
-          alert("Unable to get location. Please enter manually.");
+          toast.error("Unable to get location. Please enter manually.");
         }
       );
     }
@@ -56,13 +58,13 @@ export default function ReportEmergencyForm() {
 
     // Validate file type
     if (!file.type.startsWith("image/")) {
-      alert("Please select an image file");
+      toast.error("Please select an image file");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5MB");
+      toast.error("Image size must be less than 5MB");
       return;
     }
 
@@ -72,6 +74,7 @@ export default function ReportEmergencyForm() {
       const base64String = reader.result as string;
       setImagePreview(base64String);
       setFormData((prev) => ({ ...prev, photoUrl: base64String }));
+      toast.success("Image uploaded successfully");
     };
     reader.readAsDataURL(file);
   };
@@ -85,22 +88,27 @@ export default function ReportEmergencyForm() {
     e.preventDefault();
     
     if (!formData.emergencyType || !formData.description || !formData.latitude || !formData.longitude) {
-      alert("Please fill all required fields");
+      toast.error("Please fill all required fields");
       return;
     }
 
     setLoading(true);
 
     try {
+      const token = localStorage.getItem("bearer_token");
+      
       // Create incident
       const incidentRes = await fetch("/api/incidents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           ...formData,
           latitude: parseFloat(formData.latitude),
           longitude: parseFloat(formData.longitude),
-          userId: session?.user?.id ? parseInt(session.user.id) : null,
+          userId: session?.user?.id || null,
         }),
       });
 
@@ -109,7 +117,10 @@ export default function ReportEmergencyForm() {
       // Send alert to emergency services
       await fetch("/api/twilio/alert", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           emergencyType: formData.emergencyType,
           description: formData.description,
@@ -120,11 +131,11 @@ export default function ReportEmergencyForm() {
         }),
       });
 
-      alert("Emergency reported successfully! Help is on the way.");
+      toast.success("Emergency reported successfully! Help is on the way.");
       router.push("/dashboard");
     } catch (error) {
       console.error("Submit error:", error);
-      alert("Failed to report emergency. Please try again.");
+      toast.error("Failed to report emergency. Please try again.");
     } finally {
       setLoading(false);
     }
