@@ -1,29 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useState, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Navigation, MapPin } from "lucide-react";
 import { toast } from "sonner";
-
-// Dynamically import map components to avoid SSR issues
-const MapContainer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.MapContainer),
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  () => import("react-leaflet").then((mod) => mod.TileLayer),
-  { ssr: false }
-);
-const Marker = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Marker),
-  { ssr: false }
-);
-const Popup = dynamic(
-  () => import("react-leaflet").then((mod) => mod.Popup),
-  { ssr: false }
-);
+import Script from "next/script";
 
 interface Incident {
   id: number;
@@ -40,38 +20,15 @@ interface Incident {
 export default function MapView() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
-  const [mapZoom, setMapZoom] = useState(5);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const userMarkerRef = useRef<google.maps.Marker | null>(null);
+  const accuracyCircleRef = useRef<google.maps.Circle | null>(null);
 
+  // Fetch incidents
   useEffect(() => {
-    // Load Leaflet CSS
-    import("leaflet/dist/leaflet.css").then(() => {
-      setLeafletLoaded(true);
-    });
-
-    // Request user location
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const userPos: [number, number] = [
-            position.coords.latitude,
-            position.coords.longitude,
-          ];
-          setUserLocation(userPos);
-          setMapCenter(userPos);
-          setMapZoom(13);
-          toast.success("Your location has been detected");
-        },
-        (error) => {
-          console.error("Geolocation error:", error);
-          toast.error("Could not detect your location. Showing default map view.");
-        }
-      );
-    }
-
-    // Fetch incidents
     fetch("/api/incidents?status=active&limit=50")
       .then((res) => res.json())
       .then((data) => {
@@ -95,124 +52,287 @@ export default function MapView() {
     return () => clearInterval(interval);
   }, []);
 
-  const navigateToIncident = (lat: number, lng: number, locationName: string) => {
-    if (!userLocation) {
-      toast.error("Your location is not available. Please enable location services.");
-      return;
-    }
+  // Initialize Google Maps when loaded
+  useEffect(() => {
+    if (!googleMapsLoaded || !mapRef.current) return;
 
-    // Create Google Maps URL with directions
-    const origin = `${userLocation[0]},${userLocation[1]}`;
-    const destination = `${lat},${lng}`;
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    // Request user location
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const userPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          const accuracy = position.coords.accuracy;
 
-    // Open in new tab (handles iframe context)
-    const isInIframe = window.self !== window.top;
-    if (isInIframe) {
-      window.parent.postMessage(
-        { type: "OPEN_EXTERNAL_URL", data: { url: googleMapsUrl } },
-        "*"
+          setUserLocation(userPos);
+
+          // Initialize map centered on user location
+          const map = new google.maps.Map(mapRef.current!, {
+            center: userPos,
+            zoom: 15,
+            mapTypeControl: true,
+            streetViewControl: false,
+            fullscreenControl: true,
+          });
+
+          mapInstanceRef.current = map;
+
+          // Create pulsing blue dot for user location
+          createUserLocationMarker(map, userPos, accuracy);
+
+          toast.success("Your location has been detected");
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          toast.error("Could not detect your location. Please enable location access.");
+
+          // Initialize map with default center (India)
+          const defaultCenter = { lat: 20.5937, lng: 78.9629 };
+          const map = new google.maps.Map(mapRef.current!, {
+            center: defaultCenter,
+            zoom: 5,
+            mapTypeControl: true,
+            streetViewControl: false,
+            fullscreenControl: true,
+          });
+
+          mapInstanceRef.current = map;
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
       );
     } else {
-      window.open(googleMapsUrl, "_blank", "noopener,noreferrer");
+      toast.error("Geolocation is not supported by your browser");
+
+      // Initialize map with default center
+      const defaultCenter = { lat: 20.5937, lng: 78.9629 };
+      const map = new google.maps.Map(mapRef.current!, {
+        center: defaultCenter,
+        zoom: 5,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+      });
+
+      mapInstanceRef.current = map;
     }
-    
-    toast.success(`Opening directions to ${locationName || "incident location"}`);
+  }, [googleMapsLoaded]);
+
+  // Add incident markers when map and data are ready
+  useEffect(() => {
+    if (!mapInstanceRef.current || loading) return;
+
+    // Clear existing incident markers (if needed)
+    incidents.forEach((incident) => {
+      createIncidentMarker(mapInstanceRef.current!, incident);
+    });
+  }, [incidents, loading]);
+
+  const createUserLocationMarker = (
+    map: google.maps.Map,
+    position: { lat: number; lng: number },
+    accuracy: number
+  ) => {
+    // Remove existing markers if any
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setMap(null);
+    }
+    if (accuracyCircleRef.current) {
+      accuracyCircleRef.current.setMap(null);
+    }
+
+    // Create accuracy circle (light blue)
+    accuracyCircleRef.current = new google.maps.Circle({
+      map: map,
+      center: position,
+      radius: accuracy,
+      strokeColor: "#4285F4",
+      strokeOpacity: 0.3,
+      strokeWeight: 1,
+      fillColor: "#4285F4",
+      fillOpacity: 0.1,
+      clickable: false,
+    });
+
+    // Create pulsing blue dot using SymbolPath.CIRCLE
+    userMarkerRef.current = new google.maps.Marker({
+      map: map,
+      position: position,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: "#4285F4",
+        fillOpacity: 1,
+        strokeColor: "#FFFFFF",
+        strokeWeight: 2,
+      },
+      title: "Your Location",
+      zIndex: 1000,
+    });
+
+    // Add pulsing animation
+    const pulsingAnimation = () => {
+      let scale = 8;
+      let growing = true;
+      
+      setInterval(() => {
+        if (growing) {
+          scale += 0.3;
+          if (scale >= 12) growing = false;
+        } else {
+          scale -= 0.3;
+          if (scale <= 8) growing = true;
+        }
+        
+        if (userMarkerRef.current) {
+          userMarkerRef.current.setIcon({
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: scale,
+            fillColor: "#4285F4",
+            fillOpacity: growing ? 1 - (scale - 8) / 8 : 0.7 + (12 - scale) / 8,
+            strokeColor: "#FFFFFF",
+            strokeWeight: 2,
+          });
+        }
+      }, 50);
+    };
+
+    pulsingAnimation();
+
+    // Add info window
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div style="padding: 8px;">
+          <h3 style="font-weight: bold; margin-bottom: 4px;">Your Location</h3>
+          <p style="font-size: 12px; color: #666;">
+            Lat: ${position.lat.toFixed(6)}<br/>
+            Lng: ${position.lng.toFixed(6)}<br/>
+            Accuracy: ±${Math.round(accuracy)}m
+          </p>
+        </div>
+      `,
+    });
+
+    userMarkerRef.current.addListener("click", () => {
+      infoWindow.open(map, userMarkerRef.current!);
+    });
   };
 
-  if (!leafletLoaded || loading) {
+  const createIncidentMarker = (map: google.maps.Map, incident: Incident) => {
+    // Create red marker (Google Maps default style)
+    const marker = new google.maps.Marker({
+      map: map,
+      position: { lat: incident.latitude, lng: incident.longitude },
+      title: incident.emergencyType.toUpperCase(),
+      icon: {
+        url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
+      },
+    });
+
+    // Create info window with incident details
+    const infoWindow = new google.maps.InfoWindow({
+      content: `
+        <div style="padding: 12px; max-width: 300px;">
+          <h3 style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">
+            ${incident.emergencyType.toUpperCase()}
+          </h3>
+          
+          <div style="margin-bottom: 12px;">
+            <p style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">Description:</p>
+            <p style="font-size: 13px; color: #666;">${incident.description}</p>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <p style="font-size: 13px; font-weight: 500; margin-bottom: 4px;">Location:</p>
+            <p style="font-size: 13px; color: #666;">
+              ${incident.locationName || "Unknown location"}
+            </p>
+            <p style="font-size: 11px; color: #999; margin-top: 4px;">
+              ${incident.latitude.toFixed(4)}, ${incident.longitude.toFixed(4)}
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <span style="font-size: 11px; padding: 4px 8px; border-radius: 4px; background: #fee; color: #c00; font-weight: 500;">
+              ${incident.severity}
+            </span>
+            <span style="font-size: 11px; padding: 4px 8px; border-radius: 4px; background: #eff; color: #06c; font-weight: 500;">
+              ${incident.status}
+            </span>
+          </div>
+
+          <button
+            onclick="window.navigateToIncident(${incident.latitude}, ${incident.longitude}, '${incident.locationName || 'incident'}')"
+            style="width: 100%; padding: 8px 16px; background: #4285F4; color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;"
+            ${!userLocation ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}
+          >
+            🧭 Navigate to Location
+          </button>
+          
+          ${!userLocation ? '<p style="font-size: 11px; color: #999; text-align: center; margin-top: 8px;">Enable location to navigate</p>' : ''}
+        </div>
+      `,
+    });
+
+    marker.addListener("click", () => {
+      infoWindow.open(map, marker);
+    });
+  };
+
+  // Make navigation function globally available
+  useEffect(() => {
+    (window as any).navigateToIncident = (
+      lat: number,
+      lng: number,
+      locationName: string
+    ) => {
+      if (!userLocation) {
+        toast.error("Your location is not available. Please enable location services.");
+        return;
+      }
+
+      const origin = `${userLocation.lat},${userLocation.lng}`;
+      const destination = `${lat},${lng}`;
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+
+      const isInIframe = window.self !== window.top;
+      if (isInIframe) {
+        window.parent.postMessage(
+          { type: "OPEN_EXTERNAL_URL", data: { url: googleMapsUrl } },
+          "*"
+        );
+      } else {
+        window.open(googleMapsUrl, "_blank", "noopener,noreferrer");
+      }
+
+      toast.success(`Opening directions to ${locationName}`);
+    };
+  }, [userLocation]);
+
+  if (loading) {
     return <Skeleton className="w-full h-[500px]" />;
   }
 
   return (
-    <div className="w-full h-[500px] rounded-lg overflow-hidden border">
-      <MapContainer
-        center={mapCenter}
-        zoom={mapZoom}
-        style={{ height: "100%", width: "100%" }}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        
-        {/* User Location Marker */}
-        {userLocation && (
-          <Marker position={userLocation}>
-            <Popup>
-              <div className="p-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <MapPin className="h-4 w-4 text-blue-600" />
-                  <h3 className="font-bold text-sm">Your Location</h3>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {userLocation[0].toFixed(4)}, {userLocation[1].toFixed(4)}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
+    <>
+      <Script
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"
+        onLoad={() => setGoogleMapsLoaded(true)}
+        strategy="afterInteractive"
+      />
+      <div className="w-full h-[500px] rounded-lg overflow-hidden border relative">
+        <div ref={mapRef} className="w-full h-full" />
+        {!googleMapsLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-muted">
+            <p className="text-muted-foreground">Loading map...</p>
+          </div>
         )}
-
-        {/* Incident Markers */}
-        {incidents.map((incident) => (
-          <Marker
-            key={incident.id}
-            position={[incident.latitude, incident.longitude]}
-          >
-            <Popup maxWidth={300}>
-              <div className="p-3">
-                <h3 className="font-bold text-base mb-2">
-                  {incident.emergencyType.toUpperCase()}
-                </h3>
-                
-                <div className="mb-3">
-                  <p className="text-sm font-medium mb-1">Description:</p>
-                  <p className="text-sm text-muted-foreground">{incident.description}</p>
-                </div>
-
-                <div className="mb-3">
-                  <p className="text-sm font-medium mb-1">Location:</p>
-                  <p className="text-sm text-muted-foreground">
-                    {incident.locationName || "Unknown location"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Coordinates: {incident.latitude.toFixed(4)}, {incident.longitude.toFixed(4)}
-                  </p>
-                </div>
-
-                <div className="flex gap-2 mb-3">
-                  <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 font-medium">
-                    {incident.severity}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 font-medium">
-                    {incident.status}
-                  </span>
-                </div>
-
-                <Button
-                  size="sm"
-                  className="w-full gap-2"
-                  onClick={() => navigateToIncident(
-                    incident.latitude,
-                    incident.longitude,
-                    incident.locationName || "incident"
-                  )}
-                  disabled={!userLocation}
-                >
-                  <Navigation className="h-4 w-4" />
-                  Navigate to Location
-                </Button>
-                
-                {!userLocation && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    Enable location to navigate
-                  </p>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
+      </div>
+    </>
   );
 }
