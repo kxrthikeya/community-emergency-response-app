@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, MapPin, Clock, Filter, Loader2 } from "lucide-react";
+import { AlertTriangle, MapPin, Clock, Filter, Loader2, UserX } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import GuestReportForm from "@/components/GuestReportForm";
 
 interface Incident {
   id: number;
@@ -54,6 +56,7 @@ export default function EmergenciesPage() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
+  const [guestDialogOpen, setGuestDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchIncidents();
@@ -98,6 +101,11 @@ export default function EmergenciesPage() {
     return `${Math.floor(seconds / 86400)}d ago`;
   };
 
+  const handleGuestReportSuccess = () => {
+    setGuestDialogOpen(false);
+    fetchIncidents();
+  };
+
   if (isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -120,11 +128,39 @@ export default function EmergenciesPage() {
           <p className="text-muted-foreground mt-2">
             Real-time emergency reports from your community
           </p>
-          {session && (
-            <Button onClick={() => router.push("/dashboard")} className="mt-4">
-              Report Emergency
-            </Button>
-          )}
+          <div className="flex gap-2 mt-4">
+            {session ? (
+              <Button onClick={() => router.push("/dashboard")}>
+                Report Emergency
+              </Button>
+            ) : (
+              <Dialog open={guestDialogOpen} onOpenChange={setGuestDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-destructive hover:bg-destructive/90">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Report as Guest (No Login Required)
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-destructive">
+                      <AlertTriangle className="h-5 w-5" />
+                      Report Emergency as Guest
+                    </DialogTitle>
+                    <DialogDescription>
+                      Report an emergency quickly without creating an account. Your report will be marked as "Reported by Guest".
+                    </DialogDescription>
+                  </DialogHeader>
+                  <GuestReportForm onSuccess={handleGuestReportSuccess} />
+                </DialogContent>
+              </Dialog>
+            )}
+            {!session && (
+              <Button variant="outline" onClick={() => router.push("/login")}>
+                Login to Track Your Reports
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Filters */}
@@ -220,11 +256,17 @@ export default function EmergenciesPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-xl flex items-center gap-2">
+                      <CardTitle className="text-xl flex items-center gap-2 flex-wrap">
                         {EMERGENCY_TYPE_LABELS[incident.emergencyType] || incident.emergencyType}
                         <Badge className={SEVERITY_COLORS[incident.severity] || ""}>
                           {incident.severity}
                         </Badge>
+                        {incident.userId === null && (
+                          <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300 gap-1">
+                            <UserX className="h-3 w-3" />
+                            Reported by Guest
+                          </Badge>
+                        )}
                       </CardTitle>
                       <CardDescription className="flex items-center gap-4 mt-2">
                         <span className="flex items-center gap-1">
