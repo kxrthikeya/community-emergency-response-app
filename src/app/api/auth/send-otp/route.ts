@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
-import { storeOTP, normalizePhoneNumber } from "@/lib/otp-store";
+import { db } from "@/db";
+import { otpCodes } from "@/db/schema";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/[\s\-\(\)]/g, '').replace(/[^\d\+]/g, '');
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,14 +29,27 @@ export async function POST(request: NextRequest) {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Store OTP with normalized phone number
-    storeOTP(normalizedPhone, otp);
-    console.log(`[Send OTP] OTP stored for ${normalizedPhone}: ${otp}`);
+    // Store OTP in database
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+    try {
+      await db.insert(otpCodes).values({
+        phoneNumber: normalizedPhone,
+        otpCode: otp,
+        expiresAt,
+        createdAt: new Date().toISOString(),
+      });
+      console.log(`[Send OTP] OTP stored in database for ${normalizedPhone}: ${otp}`);
+    } catch (error) {
+      console.error('[Send OTP] Error storing OTP:', error);
+      return NextResponse.json(
+        { error: "Failed to store OTP" },
+        { status: 500 }
+      );
+    }
 
     // Check if Twilio is configured
     const twilioConfigured = accountSid && authToken && phoneNumber;
     console.log(`[Send OTP] Twilio configured: ${twilioConfigured}`);
-    console.log(`[Send OTP] Environment: ${process.env.NODE_ENV}`);
 
     let smsSent = false;
     let twilioError = null;

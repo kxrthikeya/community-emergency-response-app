@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyOTP, normalizePhoneNumber } from "@/lib/otp-store";
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, otpCodes } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+
+function normalizePhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace(/[\s\-\(\)]/g, '').replace(/[^\d\+]/g, '');
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,15 +22,42 @@ export async function POST(request: NextRequest) {
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
     console.log(`[Verify OTP] Original: ${phoneNumber}, Normalized: ${normalizedPhone}, OTP: ${otp}`);
 
-    // Verify OTP
-    const isValid = verifyOTP(normalizedPhone, otp);
-    
-    if (!isValid) {
+    // Verify OTP from database
+    const otpRecords = await db.select()
+      .from(otpCodes)
+      .where(
+        and(
+          eq(otpCodes.phoneNumber, normalizedPhone),
+          eq(otpCodes.otpCode, otp)
+        )
+      )
+      .limit(1);
+
+    if (otpRecords.length === 0) {
+      console.log('[Verify OTP] No matching OTP found');
       return NextResponse.json(
-        { error: "Invalid or expired OTP" },
+        { error: "Invalid OTP or phone number" },
         { status: 400 }
       );
     }
+
+    const otpRecord = otpRecords[0];
+    const currentTime = Date.now();
+    const isExpired = otpRecord.expiresAt <= currentTime;
+
+    // Delete OTP after verification attempt
+    await db.delete(otpCodes).where(eq(otpCodes.id, otpRecord.id));
+    console.log('[Verify OTP] OTP deleted from database');
+
+    if (isExpired) {
+      console.log('[Verify OTP] OTP has expired');
+      return NextResponse.json(
+        { error: "OTP has expired" },
+        { status: 400 }
+      );
+    }
+
+    console.log('[Verify OTP] OTP is valid');
 
     // Find or create user
     let user = await db.query.users.findFirst({
@@ -44,6 +74,9 @@ export async function POST(request: NextRequest) {
       }).returning();
       
       user = result[0];
+      console.log('[Verify OTP] Created new user:', user.id);
+    } else {
+      console.log('[Verify OTP] Found existing user:', user.id);
     }
 
     // Generate session token

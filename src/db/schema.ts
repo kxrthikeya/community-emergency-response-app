@@ -54,6 +54,14 @@ export const notifications = sqliteTable('notifications', {
   createdAt: text('created_at').notNull(),
 });
 
+export const otpCodes = sqliteTable('otp_codes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  phoneNumber: text('phone_number').notNull(),
+  otpCode: text('otp_code').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
 
 // Auth tables for better-auth
 export const user = sqliteTable("user", {

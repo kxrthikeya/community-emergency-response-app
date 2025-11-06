@@ -15,6 +15,13 @@
       "when": 1762261994636,
       "tag": "0001_chilly_franklin_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1762451245168,
+      "tag": "0002_fluffy_wallflower",
+      "breakpoints": true
     }
   ]
 }
