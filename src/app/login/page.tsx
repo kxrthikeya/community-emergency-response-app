@@ -6,9 +6,8 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, AlertTriangle, Mail, Lock, Eye, EyeOff } from "lucide-react";
-import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, AlertTriangle, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -16,12 +15,10 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { data: session, isPending } = useSession();
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    rememberMe: false,
-  });
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [countdown, setCountdown] = useState(0);
 
   useEffect(() => {
     if (!isPending && session?.user) {
@@ -30,33 +27,91 @@ export default function LoginPage() {
     }
   }, [session, isPending, router, searchParams]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
-    if (!formData.email || !formData.password) {
-      toast.error("Please enter your email and password");
+  const handleSendOTP = async () => {
+    if (!phoneNumber) {
+      toast.error("Please enter your phone number");
+      return;
+    }
+
+    // Validate phone number format (basic)
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(phoneNumber.replace(/\s/g, ""))) {
+      toast.error("Please enter a valid phone number");
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await authClient.signIn.email({
-        email: formData.email,
-        password: formData.password,
-        rememberMe: formData.rememberMe,
-        callbackURL: searchParams.get("redirect") || "/dashboard",
+      const response = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: phoneNumber.replace(/\s/g, "") }),
       });
 
-      if (error?.code) {
-        toast.error("Invalid email or password. Please try again.");
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to send OTP");
         return;
+      }
+
+      toast.success("OTP sent successfully!");
+      if (data.otp) {
+        toast.info(`Dev Mode - OTP: ${data.otp}`);
+      }
+      setOtpSent(true);
+      setCountdown(60);
+    } catch (error) {
+      console.error("Send OTP error:", error);
+      toast.error("Failed to send OTP. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!otp) {
+      toast.error("Please enter the OTP");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          phoneNumber: phoneNumber.replace(/\s/g, ""), 
+          otp 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Invalid OTP");
+        return;
+      }
+
+      // Store token
+      if (data.token) {
+        localStorage.setItem("bearer_token", data.token);
       }
 
       toast.success("Login successful!");
       router.push(searchParams.get("redirect") || "/dashboard");
     } catch (error) {
-      console.error("Login error:", error);
-      toast.error("Failed to sign in. Please try again.");
+      console.error("Verify OTP error:", error);
+      toast.error("Failed to verify OTP. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -81,9 +136,39 @@ export default function LoginPage() {
     }
   };
 
+  const handleGuestMode = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/auth/guest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to enter guest mode");
+        return;
+      }
+
+      // Store guest token
+      if (data.token) {
+        localStorage.setItem("bearer_token", data.token);
+      }
+
+      toast.success("Guest mode activated");
+      router.push("/emergencies");
+    } catch (error) {
+      console.error("Guest mode error:", error);
+      toast.error("Failed to activate guest mode");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5EDE4]">
         <Loader2 className="h-8 w-8 animate-spin text-red-600" />
       </div>
     );
@@ -94,181 +179,202 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-[#F5EDE4] flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
         {/* Logo and Title */}
         <div className="text-center mb-8 space-y-3">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-red-600 rounded-full mb-2">
-            <AlertTriangle className="h-8 w-8 text-white" />
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="flex items-center justify-center w-12 h-12 bg-red-600 rounded-lg">
+              <AlertTriangle className="h-7 w-7 text-white" />
+            </div>
+            <h1 className="text-4xl font-bold text-gray-900">EmergencyConnect</h1>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">EmergencyConnect</h1>
-          <p className="text-gray-600">Sign in to report and track emergencies</p>
+          <p className="text-gray-600 text-lg">
+            Report emergencies instantly. Get help faster. Save lives together.
+          </p>
         </div>
 
         {/* Login Card */}
-        <Card className="border-none shadow-2xl">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
-            <CardDescription className="text-center">
-              Enter your credentials to access your account
-            </CardDescription>
+        <Card className="border-none shadow-lg bg-white">
+          <CardHeader className="space-y-1 pb-6">
+            <CardTitle className="text-2xl font-bold text-left">
+              Sign In to EmergencyConnect
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {/* Email Field */}
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="pl-10 h-11"
-                    disabled={loading}
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="pl-10 pr-10 h-11"
-                    disabled={loading}
-                    autoComplete="off"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Remember Me */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <input
-                    id="remember"
-                    type="checkbox"
-                    checked={formData.rememberMe}
-                    onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                  />
-                  <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
-                    Remember me
+          <CardContent className="space-y-6">
+            {!otpSent ? (
+              <>
+                {/* Phone Number Field */}
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-sm font-medium">
+                    Phone Number
                   </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+91 9876543210"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="flex-1 h-12 text-base"
+                      disabled={loading}
+                    />
+                    <Button
+                      onClick={handleSendOTP}
+                      disabled={loading || !phoneNumber}
+                      className="h-12 px-6 bg-gray-600 hover:bg-gray-700 text-white font-medium"
+                    >
+                      {loading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        "Send OTP"
+                      )}
+                    </Button>
+                  </div>
                 </div>
+              </>
+            ) : (
+              <>
+                {/* OTP Field */}
+                <form onSubmit={handleVerifyOTP} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="otp" className="text-sm font-medium">
+                      Enter OTP
+                    </Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="Enter 6-digit OTP"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="h-12 text-base text-center text-2xl tracking-widest"
+                      disabled={loading}
+                      maxLength={6}
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">
+                        OTP sent to {phoneNumber}
+                      </span>
+                      {countdown > 0 ? (
+                        <span className="text-gray-500">Resend in {countdown}s</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOtpSent(false);
+                            setOtp("");
+                          }}
+                          className="text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Change Number
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-medium text-base"
+                    disabled={loading || otp.length !== 6}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      "Verify & Sign In"
+                    )}
+                  </Button>
+                </form>
+              </>
+            )}
+
+            {/* Divider */}
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-gray-300" />
               </div>
-
-              {/* Sign In Button */}
-              <Button
-                type="submit"
-                className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-medium"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  "Sign In"
-                )}
-              </Button>
-
-              {/* Divider */}
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">Or continue with</span>
-                </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-3 text-gray-500 font-medium">
+                  OR CONTINUE WITH
+                </span>
               </div>
-
-              {/* Google Sign In */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-11 border-2"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                Sign in with Google
-              </Button>
-            </form>
-
-            {/* Register Link */}
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link
-                  href="/register"
-                  className="font-semibold text-red-600 hover:text-red-700 hover:underline"
-                >
-                  Create one now
-                </Link>
-              </p>
             </div>
+
+            {/* Google Sign In */}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12 border-2 font-medium text-base"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+            >
+              <Mail className="mr-2 h-5 w-5" />
+              Continue with Google
+            </Button>
+
+            {/* Guest Mode */}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12 border-2 font-medium text-base"
+              onClick={handleGuestMode}
+              disabled={loading}
+            >
+              <svg
+                className="mr-2 h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+              Continue as Guest
+            </Button>
           </CardContent>
         </Card>
 
-        {/* Guest Access */}
-        <div className="mt-6 text-center">
+        {/* Emergency Actions */}
+        <div className="mt-6 space-y-3">
           <Button
-            variant="ghost"
-            className="text-gray-700 hover:text-gray-900"
+            variant="default"
+            className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-semibold text-base"
             onClick={() => router.push("/emergencies")}
           >
-            View Emergency Feed Without Login
+            <Phone className="mr-2 h-5 w-5" />
+            Emergency Contacts
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full h-12 border-2 font-medium text-base bg-white"
+            onClick={() => router.push("/emergencies")}
+          >
+            <svg
+              className="mr-2 h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+              />
+            </svg>
+            View Emergency Feed
           </Button>
         </div>
 
         {/* Emergency Notice */}
-        <div className="mt-8 text-center space-y-2">
-          <p className="text-sm text-gray-600">
-            🚨 <span className="font-semibold">In immediate danger?</span>
-          </p>
-          <p className="text-sm font-bold text-red-600">
-            Call Emergency Services: 112 (India)
+        <div className="mt-8 text-center">
+          <p className="text-sm text-gray-600 leading-relaxed">
+            In an emergency? Use guest mode to report immediately or call emergency services directly.
           </p>
         </div>
       </div>
