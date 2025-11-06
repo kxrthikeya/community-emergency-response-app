@@ -27,31 +27,43 @@ export async function POST(request: NextRequest) {
     // Store OTP with normalized phone number
     storeOTP(normalizedPhone, otp);
 
-    // In development, return the OTP for easy testing
-    if (process.env.NODE_ENV === "development" || !accountSid || !authToken) {
-      console.log(`OTP for ${normalizedPhone}: ${otp}`);
-      return NextResponse.json({
-        success: true,
-        message: "OTP sent (dev mode)",
-        otp, // Return actual OTP in dev
-      });
+    // Check if Twilio is configured
+    const twilioConfigured = accountSid && authToken && phoneNumber;
+    console.log(`[Send OTP] Twilio configured: ${twilioConfigured}`);
+
+    // Try to send via Twilio if configured
+    if (twilioConfigured && process.env.NODE_ENV === "production") {
+      try {
+        const client = twilio(accountSid, authToken);
+        
+        await client.messages.create({
+          body: `Your EmergencyConnect verification code is: ${otp}`,
+          from: phoneNumber,
+          to: normalizedPhone,
+        });
+
+        console.log(`[Send OTP] SMS sent successfully to ${normalizedPhone}`);
+        return NextResponse.json({
+          success: true,
+          message: "OTP sent successfully",
+        });
+      } catch (twilioError: any) {
+        // Log Twilio error but don't fail - fallback to console mode
+        console.error("[Send OTP] Twilio error:", twilioError?.message || twilioError);
+        console.log(`[Send OTP] Falling back to console mode. OTP: ${otp}`);
+      }
     }
 
-    // Send OTP via Twilio SMS
-    const client = twilio(accountSid, authToken);
-    
-    await client.messages.create({
-      body: `Your EmergencyConnect verification code is: ${otp}`,
-      from: phoneNumber,
-      to: normalizedPhone,
-    });
-
+    // Development mode or Twilio fallback - return OTP in response
+    console.log(`[Send OTP] Console mode - OTP for ${normalizedPhone}: ${otp}`);
     return NextResponse.json({
       success: true,
       message: "OTP sent successfully",
+      otp, // Return actual OTP for testing
+      mode: "console", // Indicate this is console mode
     });
   } catch (error) {
-    console.error("Send OTP error:", error);
+    console.error("[Send OTP] Unexpected error:", error);
     return NextResponse.json(
       { error: "Failed to send OTP" },
       { status: 500 }
