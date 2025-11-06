@@ -13,7 +13,7 @@ import { toast } from "sonner";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, refetch } = useSession();
   const [loading, setLoading] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
@@ -129,6 +129,11 @@ function LoginForm() {
       }
 
       toast.success("Login successful!");
+      
+      // Refetch session to update auth state
+      await refetch();
+      
+      // Navigate will be handled by useEffect after session updates
       router.push(searchParams.get("redirect") || "/dashboard");
     } catch (error) {
       console.error("Verify OTP error:", error);
@@ -178,6 +183,10 @@ function LoginForm() {
       }
 
       toast.success("Guest mode activated");
+      
+      // Refetch session before navigation
+      await refetch();
+      
       router.push("/emergencies");
     } catch (error) {
       console.error("Guest mode error:", error);
