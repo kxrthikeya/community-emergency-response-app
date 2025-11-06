@@ -59,13 +59,34 @@ function LoginForm() {
 
       if (!response.ok) {
         toast.error(data.error || "Failed to send OTP");
+        if (data.details) {
+          console.error("OTP Send Error Details:", data.details);
+        }
         return;
       }
 
-      toast.success("OTP sent successfully!");
-      if (data.otp) {
-        toast.info(`Dev Mode - OTP: ${data.otp}`);
+      // Show success message
+      if (data.mode === "sms") {
+        toast.success("OTP sent via SMS!");
+      } else {
+        toast.success("OTP generated successfully!");
       }
+
+      // Show OTP if returned (console mode or Twilio failed)
+      if (data.otp) {
+        toast.info(`Your OTP: ${data.otp}`, {
+          duration: 10000, // Show for 10 seconds
+        });
+      }
+
+      // Show Twilio error if present (but don't fail - OTP is still generated)
+      if (data.twilioError) {
+        console.warn("Twilio Error:", data.twilioError);
+        toast.warning(`SMS failed (${data.twilioError.code}). Use OTP shown above.`, {
+          duration: 8000,
+        });
+      }
+
       setOtpSent(true);
       setCountdown(60);
     } catch (error) {
