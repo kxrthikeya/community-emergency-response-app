@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import twilio from "twilio";
-import { storeOTP } from "@/lib/otp-store";
+import { storeOTP, normalizePhoneNumber } from "@/lib/otp-store";
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -17,15 +17,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize phone number
+    const normalizedPhone = normalizePhoneNumber(userPhone);
+    console.log(`[Send OTP] Original: ${userPhone}, Normalized: ${normalizedPhone}`);
+
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Store OTP
-    storeOTP(userPhone, otp);
+    // Store OTP with normalized phone number
+    storeOTP(normalizedPhone, otp);
 
     // In development, return the OTP for easy testing
     if (process.env.NODE_ENV === "development" || !accountSid || !authToken) {
-      console.log(`OTP for ${userPhone}: ${otp}`);
+      console.log(`OTP for ${normalizedPhone}: ${otp}`);
       return NextResponse.json({
         success: true,
         message: "OTP sent (dev mode)",
@@ -39,7 +43,7 @@ export async function POST(request: NextRequest) {
     await client.messages.create({
       body: `Your EmergencyConnect verification code is: ${otp}`,
       from: phoneNumber,
-      to: userPhone,
+      to: normalizedPhone,
     });
 
     return NextResponse.json({
