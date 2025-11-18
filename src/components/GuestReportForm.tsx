@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,11 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
     photoUrl: "",
   });
 
+  // Auto-get location on mount
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
   const getCurrentLocation = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -41,7 +46,7 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
             latitude: position.coords.latitude.toString(),
             longitude: position.coords.longitude.toString(),
           }));
-          toast.success("Location detected successfully");
+          toast.success("Location detected automatically");
         },
         (error) => {
           console.error("Location error:", error);
@@ -86,8 +91,13 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.emergencyType || !formData.description || !formData.latitude || !formData.longitude) {
-      toast.error("Please fill all required fields");
+    if (!formData.emergencyType || !formData.description) {
+      toast.error("Please select emergency type and describe the situation");
+      return;
+    }
+
+    if (!formData.latitude || !formData.longitude) {
+      toast.error("Location is required. Please enable location access or enter manually.");
       return;
     }
 
@@ -105,6 +115,7 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
           latitude: parseFloat(formData.latitude),
           longitude: parseFloat(formData.longitude),
           userId: null, // Guest report - no user ID
+          locationName: formData.locationName || `${formData.latitude}, ${formData.longitude}`,
         }),
       });
 
@@ -121,7 +132,7 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
         body: JSON.stringify({
           emergencyType: formData.emergencyType,
           description: `[GUEST REPORT] ${formData.description}`,
-          locationName: formData.locationName,
+          locationName: formData.locationName || `${formData.latitude}, ${formData.longitude}`,
           latitude: formData.latitude,
           longitude: formData.longitude,
           severity: formData.severity,
@@ -177,26 +188,6 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="severity">Severity *</Label>
-        <Select
-          value={formData.severity}
-          onValueChange={(value) =>
-            setFormData((prev) => ({ ...prev, severity: value }))
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="low">Low</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="critical">Critical</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor="description">Description *</Label>
         <Textarea
           id="description"
@@ -205,115 +196,146 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
           onChange={(e) =>
             setFormData((prev) => ({ ...prev, description: e.target.value }))
           }
-          rows={4}
+          rows={3}
         />
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="locationName">Location Name *</Label>
-        <Input
-          id="locationName"
-          placeholder="e.g., Connaught Place, Delhi"
-          value={formData.locationName}
-          onChange={(e) =>
-            setFormData((prev) => ({ ...prev, locationName: e.target.value }))
-          }
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      {/* Optional Fields - Collapsed by default */}
+      <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+        <p className="text-sm font-medium text-muted-foreground">Optional Details</p>
+        
         <div className="space-y-2">
-          <Label htmlFor="latitude">Latitude *</Label>
+          <Label htmlFor="severity">Severity (defaults to Medium)</Label>
+          <Select
+            value={formData.severity}
+            onValueChange={(value) =>
+              setFormData((prev) => ({ ...prev, severity: value }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="locationName">Location Name</Label>
           <Input
-            id="latitude"
-            type="number"
-            step="any"
-            placeholder="28.6289"
-            value={formData.latitude}
+            id="locationName"
+            placeholder="e.g., Connaught Place, Delhi (optional)"
+            value={formData.locationName}
             onChange={(e) =>
-              setFormData((prev) => ({ ...prev, latitude: e.target.value }))
+              setFormData((prev) => ({ ...prev, locationName: e.target.value }))
             }
           />
         </div>
+
+        {/* Photo Upload */}
         <div className="space-y-2">
-          <Label htmlFor="longitude">Longitude *</Label>
-          <Input
-            id="longitude"
-            type="number"
-            step="any"
-            placeholder="77.2065"
-            value={formData.longitude}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, longitude: e.target.value }))
-            }
-          />
+          <Label htmlFor="photo">Upload Photo</Label>
+          {imagePreview ? (
+            <div className="relative">
+              <img
+                src={imagePreview}
+                alt="Emergency preview"
+                className="w-full h-48 object-cover rounded-lg border"
+              />
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon"
+                className="absolute top-2 right-2"
+                onClick={removeImage}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
+              <input
+                id="photo"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <label htmlFor="photo" className="cursor-pointer">
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Click to upload image
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  PNG, JPG up to 5MB
+                </p>
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full gap-2"
-        onClick={getCurrentLocation}
-      >
-        <MapPin className="h-4 w-4" />
-        Use Current Location
-      </Button>
-
-      {/* Photo Upload */}
-      <div className="space-y-2">
-        <Label htmlFor="photo">Upload Photo (optional)</Label>
-        {imagePreview ? (
-          <div className="relative">
-            <img
-              src={imagePreview}
-              alt="Emergency preview"
-              className="w-full h-48 object-cover rounded-lg border"
-            />
-            <Button
-              type="button"
-              variant="destructive"
-              size="icon"
-              className="absolute top-2 right-2"
-              onClick={removeImage}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center hover:border-primary transition-colors cursor-pointer">
-            <input
-              id="photo"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleFileChange}
-            />
-            <label htmlFor="photo" className="cursor-pointer">
-              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Click to upload image
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                PNG, JPG up to 5MB
-              </p>
-            </label>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-        <div className="flex gap-2">
-          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-          <div className="text-sm">
-            <p className="font-medium text-yellow-800 dark:text-yellow-200">Guest Report Notice</p>
-            <p className="text-yellow-700 dark:text-yellow-300 mt-1">
-              Your report will be submitted anonymously and marked as "Reported by Guest". 
-              Create an account to track your reports and receive updates.
+      {/* Location Info - Auto-detected */}
+      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <div className="flex items-start gap-2">
+          <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm flex-1">
+            <p className="font-medium text-blue-800 dark:text-blue-200">
+              {formData.latitude && formData.longitude ? "Location Detected" : "Getting Location..."}
             </p>
+            {formData.latitude && formData.longitude ? (
+              <p className="text-blue-700 dark:text-blue-300 text-xs mt-1">
+                {formData.latitude}, {formData.longitude}
+              </p>
+            ) : (
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0 text-xs text-blue-600 hover:text-blue-700"
+                onClick={getCurrentLocation}
+              >
+                Retry Location Detection
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Manual Location Override (collapsed) */}
+      {(!formData.latitude || !formData.longitude) && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="latitude">Latitude *</Label>
+            <Input
+              id="latitude"
+              type="number"
+              step="any"
+              placeholder="28.6289"
+              value={formData.latitude}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, latitude: e.target.value }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="longitude">Longitude *</Label>
+            <Input
+              id="longitude"
+              type="number"
+              step="any"
+              placeholder="77.2065"
+              value={formData.longitude}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, longitude: e.target.value }))
+              }
+            />
+          </div>
+        </div>
+      )}
 
       <Button
         type="submit"
@@ -329,10 +351,14 @@ export default function GuestReportForm({ onSuccess }: GuestReportFormProps) {
         ) : (
           <>
             <AlertCircle className="h-4 w-4 mr-2" />
-            Report Emergency as Guest
+            Report Emergency Now
           </>
         )}
       </Button>
+
+      <p className="text-xs text-center text-muted-foreground">
+        Your report will be submitted anonymously. Create an account to track updates.
+      </p>
     </form>
   );
 }
